@@ -34,10 +34,20 @@ namespace FileCopier.Core
 
             if (configuration.AlwaysBackup || (backupQueryFunc != null && backupQueryFunc()))
             {
-                StartTickEndExecute(backupStartedFunc, backupTickFunc, backupEndedFunc, () => CreateBackup(configuration));
+                bool isBackupOk = StartTickEndExecute(backupStartedFunc, backupTickFunc, backupEndedFunc, () => CreateBackup(configuration));
+                if (!isBackupOk)
+                {
+                    message = "Error while doing backup.";
+                    return false;
+                }
             }
 
-            StartTickEndExecute(copyStartedFunc, copyTickFunc, copyEndedFunc, () => DirectoryCopy(configuration));
+            bool isCopyOk = StartTickEndExecute(copyStartedFunc, copyTickFunc, copyEndedFunc, () => DirectoryCopy(configuration));
+            if (!isCopyOk)
+            {
+                message = "Error while copying files.";
+                return false;
+            }
 
             return true;
         }
@@ -90,12 +100,13 @@ namespace FileCopier.Core
             return !string.IsNullOrWhiteSpace(path) && Directory.Exists(path);
         }
 
-        private static void StartTickEndExecute(Action startedFunc, Action tickFunc, Action endedFunc, Action doWork)
+        private static bool StartTickEndExecute(Action startedFunc, Action tickFunc, Action endedFunc, Action doWork)
         {
             if (startedFunc != null)
             {
                 startedFunc();
             }
+
             Task backupTask = Task.Run(doWork);
             while (!backupTask.IsCompleted && !backupTask.IsCanceled && !backupTask.IsFaulted)
             {
@@ -105,10 +116,18 @@ namespace FileCopier.Core
                     tickFunc();
                 }
             }
+
+            if (backupTask.IsCanceled || backupTask.IsFaulted)
+            {
+                return false;
+            }
+
             if (endedFunc != null)
             {
                 endedFunc();
             }
+
+            return true;
         }
 
         private static void CreateBackup(CopyConfiguration configuration)
