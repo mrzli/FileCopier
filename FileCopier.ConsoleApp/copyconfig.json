@@ -1,0 +1,13 @@
+[
+  {
+    "Name": "Test",
+    "SourceDir": "D:\\temp\\src",
+    "DestDirs": [
+      "D:\\temp\\dest1",
+      "D:\\temp\\dest2"
+    ],
+    "IgnorePattern": "^ignore1$|^ignore2$|^ignore.txt$",
+    "BackupDir": "D:\\temp\\backup",
+    "AlwaysBackup": false
+  }
+]
