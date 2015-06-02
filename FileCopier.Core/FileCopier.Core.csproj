@@ -36,6 +36,9 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.IO.Abstractions">
+      <HintPath>..\packages\System.IO.Abstractions.2.0.0.115\lib\net40\System.IO.Abstractions.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="Microsoft.CSharp" />
@@ -46,8 +49,8 @@
     <Compile Include="CopyConfigurationAccessor.cs" />
     <Compile Include="CopyConfiguration.cs" />
     <Compile Include="CopyConfigurationSeed.cs" />
-    <Compile Include="Executor.cs" />
-    <Compile Include="FileSystemInfoExtensions.cs" />
+    <Compile Include="CopyExecutor.cs" />
+    <Compile Include="FileSystemInfoBaseExtensions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

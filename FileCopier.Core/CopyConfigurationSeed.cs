@@ -17,7 +17,7 @@ namespace FileCopier.Core
                 Name = "Test",
                 SourceDir = @"D:\temp\src",
                 DestDirs = new List<string> { @"D:\temp\dest1", @"D:\temp\dest2" },
-                IgnorePattern = "^ignore1$|^ignore2$|^ignore.txt$",
+                IgnorePattern = "ignore1|ignore2|ignore.txt",
                 BackupDir = @"D:\temp\backup",
                 AlwaysBackup = false
             };

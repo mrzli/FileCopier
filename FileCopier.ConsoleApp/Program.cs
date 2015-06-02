@@ -1,6 +1,7 @@
 ﻿using FileCopier.Core;
 using System;
 using System.Collections.Generic;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -45,7 +46,7 @@ namespace FileCopier.ConsoleApp
                 return;
             }
 
-            Executor executor = new Executor();
+            CopyExecutor executor = new CopyExecutor(new FileSystem(), null);
 
             string message;
             bool success = executor.Execute(
@@ -76,6 +77,7 @@ namespace FileCopier.ConsoleApp
             foreach (CopyConfiguration configuration in configurations)
             {
                 Console.WriteLine("{0} - {1}", index, configuration.Name);
+                index++;
             }
             Console.WriteLine("e - Exit");
             Console.WriteLine();

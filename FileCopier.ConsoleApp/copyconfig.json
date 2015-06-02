@@ -6,8 +6,58 @@
       "D:\\temp\\dest1",
       "D:\\temp\\dest2"
     ],
-    "IgnorePattern": "^ignore1$|^ignore2$|^ignore.txt$",
+    "IgnorePattern": "ignore1|ignore2|ignore.txt",
     "BackupDir": "D:\\temp\\backup",
+    "AlwaysBackup": false
+  },
+  {
+    "Name": "Test Pugo",
+    "SourceDir": "D:\\JazzWorkspaces\\P26.PugoPort.Main\\WebSite\\PugoPort",
+    "DestDirs": [
+      "D:\\temp\\PugoCopy"
+    ],
+    "IgnorePattern": "ClientBin|[Ll]ogs|[Tt]emp|web.config",
+    "BackupDir": "D:\\temp\\PugoCopyBackup",
+    "AlwaysBackup": false
+  },
+  {
+    "Name": "Pugo DevStream-Test",
+    "SourceDir": "D:\\JazzWorkspaces\\P26.PugoPort.DevStream\\WebSite\\PugoPort",
+    "DestDirs": [
+      "\\\\vwr007\\WebApps\\PugoPort"
+    ],
+    "IgnorePattern": "ClientBin|[Ll]ogs|[Tt]emp|web.config",
+    "BackupDir": "D:\\Backup\\PugoPort\\Test",
+    "AlwaysBackup": false
+  },
+  {
+    "Name": "Pugo Main-Test",
+    "SourceDir": "D:\\JazzWorkspaces\\P26.PugoPort.Main\\WebSite\\PugoPort",
+    "DestDirs": [
+      "\\\\vwr007\\WebApps\\PugoPort"
+    ],
+    "IgnorePattern": "ClientBin|[Ll]ogs|[Tt]emp|web.config",
+    "BackupDir": "D:\\Backup\\PugoPort\\Test",
+    "AlwaysBackup": false
+  },
+  {
+    "Name": "Pugo Main-EProd",
+    "SourceDir": "D:\\JazzWorkspaces\\P26.PugoPort.Main\\WebSite\\PugoPort",
+    "DestDirs": [
+      "\\\\hercules.gzaop.local\\APIS-IT\\Razvoj\\BuildServer\\DotNet\\KAT\\P26PugoPort\\eprod"
+    ],
+    "IgnorePattern": "ClientBin|[Ll]ogs|[Tt]emp|web.config",
+    "BackupDir": "D:\\Backup\\PugoPort\\EProd",
+    "AlwaysBackup": false
+  },
+  {
+    "Name": "eZahtjev Publish-Test",
+    "SourceDir": "D:\\Publish\\eZahtjev\\1.1.0.1",
+    "DestDirs": [
+      "\\\\vwr024\\WebApps\\eZahtjev"
+    ],
+    "IgnorePattern": "[A-Za-z]+\\.config",
+    "BackupDir": "D:\\Backup\\eZahtjev\\Test",
     "AlwaysBackup": false
   }
 ]

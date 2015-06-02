@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -10,9 +10,20 @@ using System.Threading.Tasks;
 
 namespace FileCopier.Core
 {
-    public sealed class Executor
+    public sealed class CopyExecutor
     {
         private const int TICK_INTERVAL = 1000;
+
+        private IFileSystem fileSystem;
+        private Func<string, object[], string> backupFolderNamingFunc;
+
+        public CopyExecutor(
+            IFileSystem fileSystem,
+            Func<string, object[], string> backupFolderNamingFunc)
+        {
+            this.fileSystem = fileSystem;
+            this.backupFolderNamingFunc = backupFolderNamingFunc ?? DefaultBackupFolderNamingFunc;
+        }
 
         public bool Execute(
             CopyConfiguration configuration,
@@ -52,7 +63,7 @@ namespace FileCopier.Core
             return true;
         }
 
-        private static bool ValidateConfiguration(CopyConfiguration configuration, out string message)
+        private bool ValidateConfiguration(CopyConfiguration configuration, out string message)
         {
             message = "";
 
@@ -95,9 +106,9 @@ namespace FileCopier.Core
             return true;
         }
 
-        private static bool IsDirValid(string path)
+        private bool IsDirValid(string path)
         {
-            return !string.IsNullOrWhiteSpace(path) && Directory.Exists(path);
+            return !string.IsNullOrWhiteSpace(path) && fileSystem.Directory.Exists(path);
         }
 
         private static bool StartTickEndExecute(Action startedFunc, Action tickFunc, Action endedFunc, Action doWork)
@@ -130,7 +141,7 @@ namespace FileCopier.Core
             return true;
         }
 
-        private static void CreateBackup(CopyConfiguration configuration)
+        private void CreateBackup(CopyConfiguration configuration)
         {
             DateTime currentTime = DateTime.UtcNow;
             foreach (string destDir in configuration.DestDirs)
@@ -139,70 +150,67 @@ namespace FileCopier.Core
             }
         }
 
-        private static void CreateBackup(string sourcePath, string backupParentPath, DateTime currentTime)
+        private void CreateBackup(string sourcePath, string backupParentPath, DateTime currentTime)
         {
-            string sourceDirName = new DirectoryInfo(sourcePath).Name;
-            string backupPath = Path.Combine(backupParentPath, currentTime.ToString("yyyy-MM-dd_HH-mm-ss") + "_" + sourceDirName);
-            Directory.CreateDirectory(backupPath);
-            DirectoryCopy(sourcePath, backupPath, null);
+            string sourceDirName = fileSystem.DirectoryInfo.FromDirectoryName(sourcePath).Name;
+            string backupPath = fileSystem.Path.Combine(backupParentPath, backupFolderNamingFunc(sourceDirName, new object[] { currentTime }));
+            fileSystem.Directory.CreateDirectory(backupPath);
+            DoCopy(sourcePath, backupPath, null);
         }
 
-        private static void DirectoryCopy(CopyConfiguration configuration)
+        private void DirectoryCopy(CopyConfiguration configuration)
         {
             foreach (string destDir in configuration.DestDirs)
             {
-                DirectoryCopy(configuration.SourceDir, destDir, configuration.IgnorePattern);
+                DoCopy(configuration.SourceDir, destDir, configuration.IgnorePattern);
             }
         }
 
-        private static void DirectoryCopy(
-            string sourcePath,
-            string destPath,
-            string ignorePattern)
+        private void DoCopy(string sourcePath, string destPath, string ignorePattern)
         {
-            DirectoryInfo src = new DirectoryInfo(sourcePath);
-            FileSystemInfo[] fsInfos = GetFileSystemInfos(src, ignorePattern, true);
+            DirectoryInfoBase src = fileSystem.DirectoryInfo.FromDirectoryName(sourcePath);
+            FileSystemInfoBase[] fsInfos = GetFileSystemInfos(src, ignorePattern, true);
 
-            string parentFullName = src.FullName;
-            IEnumerable<DirectoryInfo> directories = fsInfos
-                .Where(x => x is DirectoryInfo)
-                .Select(x => (DirectoryInfo)x);
+            string srcParentFullName = src.FullName;
+            Parallel.ForEach(fsInfos, fsi => CopyFileSystemInfo(fsi, fileSystem, srcParentFullName, destPath));
+        }
 
-            foreach (DirectoryInfo dir in directories)
+        private static void CopyFileSystemInfo(FileSystemInfoBase fsi, IFileSystem fileSystem, string srcParentFullName, string destPath)
+        {
+            if (fsi is DirectoryInfoBase)
             {
-                string destDir = Path.Combine(destPath, dir.GetRelativePath(parentFullName));
-                Directory.CreateDirectory(destDir);
+                DirectoryInfoBase dir = (DirectoryInfoBase)fsi;
+                string destDir = fileSystem.Path.Combine(destPath, dir.GetRelativePath(srcParentFullName));
+                fileSystem.Directory.CreateDirectory(destDir);
             }
-
-            IEnumerable<FileInfo> files = fsInfos
-                .Where(x => x is FileInfo)
-                .Select(x => (FileInfo)x);
-
-            foreach (FileInfo file in files)
+            else if (fsi is FileInfoBase)
             {
-                string destFile = Path.Combine(destPath, file.GetRelativePath(parentFullName));
+                FileInfoBase file = (FileInfoBase)fsi;
+                string destFile = fileSystem.Path.Combine(destPath, file.GetRelativePath(srcParentFullName));
+                string destFileParentDir = fileSystem.Path.GetDirectoryName(destFile);
+                fileSystem.Directory.CreateDirectory(destFileParentDir); // create dir just in case it isn't already created
                 file.CopyTo(destFile, true);
             }
         }
 
-        private static FileSystemInfo[] GetFileSystemInfos(DirectoryInfo parentDir, string searchPattern, bool invertSearchPattern)
+        private FileSystemInfoBase[] GetFileSystemInfos(DirectoryInfoBase parentDir, string searchPattern, bool invertSearchPattern)
         {
-            FileSystemInfo[] allFsInfos = parentDir.GetFileSystemInfos("*", SearchOption.AllDirectories);
+            FileSystemInfoBase[] allFsInfos = parentDir.GetFileSystemInfos("*", System.IO.SearchOption.AllDirectories);
+
+            if (searchPattern == null)
+            {
+                searchPattern = "";
+            }
+
+            searchPattern = "^(" + searchPattern + ")$";
 
             string parentFullName = parentDir.FullName;
-            FileSystemInfo[] searchedFsInfos;
-            if (!string.IsNullOrEmpty(searchPattern))
-            {
-                searchedFsInfos = allFsInfos
-                    .Where(x => Regex.IsMatch(x.GetRelativePath(parentFullName), searchPattern))
-                    .ToArray();
-            }
-            else
-            {
-                searchedFsInfos = new FileSystemInfo[0];
-            }
+            FileSystemInfoBase[] searchedFsInfos;
+            searchedFsInfos = allFsInfos
+                .Where(x => Regex.IsMatch(x.GetRelativePath(parentFullName), searchPattern))
+                .ToArray();
 
-            FileSystemInfo[] resultFsInfos;
+            FileSystemInfoBase[] resultFsInfos;
             if (invertSearchPattern)
             {
                 resultFsInfos = allFsInfos
@@ -219,13 +227,13 @@ namespace FileCopier.Core
             return resultFsInfos;
         }
 
-        private static FileSystemInfo[] RemoveOrphanedFileSystemInfos(DirectoryInfo parentDir, FileSystemInfo[] infos)
+        private FileSystemInfoBase[] RemoveOrphanedFileSystemInfos(DirectoryInfoBase parentDir, FileSystemInfoBase[] infos)
         {
-            List<FileSystemInfoWithOrphaned> infosWithOrphaned = infos
-                .Select(x => new FileSystemInfoWithOrphaned { Info = x, IsOrphaned = null })
+            List<FileSystemInfoBaseWithOrphaned> infosWithOrphaned = infos
+                .Select(x => new FileSystemInfoBaseWithOrphaned { Info = x, IsOrphaned = null })
                 .ToList();
 
-            foreach (FileSystemInfoWithOrphaned infoWithOrphaned in infosWithOrphaned)
+            foreach (FileSystemInfoBaseWithOrphaned infoWithOrphaned in infosWithOrphaned)
             {
                 SetOrphaned(infoWithOrphaned, parentDir, infosWithOrphaned);
             }
@@ -236,18 +244,21 @@ namespace FileCopier.Core
                 .ToArray();
         }
 
-        private static bool SetOrphaned(FileSystemInfoWithOrphaned infoWithOrphaned, DirectoryInfo parentDir, List<FileSystemInfoWithOrphaned> infosWithOrphaned)
+        private bool SetOrphaned(
+            FileSystemInfoBaseWithOrphaned infoWithOrphaned,
+            DirectoryInfoBase parentDir,
+            List<FileSystemInfoBaseWithOrphaned> infosWithOrphaned)
         {
             if (!infoWithOrphaned.IsOrphaned.HasValue)
             {
-                DirectoryInfo parent = infoWithOrphaned.Info.GetParentDirectory();
-                if (parent.EqualsTo(parentDir))
+                DirectoryInfoBase parent = infoWithOrphaned.Info.GetParentDirectory();
+                if (Equals(parent, parentDir))
                 {
                     infoWithOrphaned.IsOrphaned = false;
                 }
-                else if (infosWithOrphaned.Any(x => x.Info.EqualsTo(parent)))
+                else if (infosWithOrphaned.Any(x => Equals(x.Info, parent)))
                 {
-                    FileSystemInfoWithOrphaned parentFsInfoWithOrphaned = infosWithOrphaned.First(x => x.Info.EqualsTo(parent));
+                    FileSystemInfoBaseWithOrphaned parentFsInfoWithOrphaned = infosWithOrphaned.First(x => Equals(x.Info, parent));
                     infoWithOrphaned.IsOrphaned = SetOrphaned(parentFsInfoWithOrphaned, parentDir, infosWithOrphaned);
                 }
                 else
@@ -259,9 +270,22 @@ namespace FileCopier.Core
             return infoWithOrphaned.IsOrphaned.Value;
         }
 
-        private class FileSystemInfoWithOrphaned
+        private bool Equals(FileSystemInfoBase info1, FileSystemInfoBase info2)
         {
-            public FileSystemInfo Info { get; set; }
+            string path1 = fileSystem.Path.Combine(info1.GetParentDirectory().FullName, info1.Name);
+            string path2 = fileSystem.Path.Combine(info2.GetParentDirectory().FullName, info2.Name);
+            return path1.Equals(path2, StringComparison.InvariantCultureIgnoreCase);
+        }
+
+        private static string DefaultBackupFolderNamingFunc(string originalName, object[] parameters)
+        {
+            DateTime time = (DateTime)parameters[0];
+            return time.ToString("yyyy-MM-dd_HH-mm-ss") + "_" + originalName;
+        }
+
+        private class FileSystemInfoBaseWithOrphaned
+        {
+            public FileSystemInfoBase Info { get; set; }
             public bool? IsOrphaned { get; set; }
         }
     }
